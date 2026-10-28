@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Security Findings Explorer — ThreatLens{% endblock %}
+{% block breadcrumb %}Security Findings{% endblock %}
+
+{% block content %}
+<!-- Top Header & Filter Controls -->
+<div class="threat-card mb-4">
+    <div class="threat-card-header">
+        <div>
+            <h3 class="threat-card-title">
+                <i class="bi bi-exclamation-octagon text-danger"></i> Security Findings Explorer
+            </h3>
+            <p class="text-muted small mb-0">
+                Audit, search, and filter identified configuration gaps across scanned targets.
+            </p>
+        </div>
+        <span class="badge bg-secondary bg-opacity-10 text-secondary border">
+            {{ findings|length }} Item(s) Loaded
+        </span>
+    </div>
+    <div class="threat-card-body p-3">
+        <form method="GET" action="{{ url_for('findings_view') }}" class="row g-2 align-items-center">
+            <!-- Scan Selector -->
+            <div class="col-md-3">
+                <label class="form-label small text-muted fw-semibold mb-1">Target Scope</label>
+                <select name="scan_id" class="form-select form-select-sm threat-input" onchange="this.form.submit()">
+                    <option value="">All Scans (Global Findings)</option>
+                    {% for s in all_scans %}
+                        <option value="{{ s.id }}" {% if selected_scan_id == s.id %}selected{% endif %}>
+                            {{ s.domain }} ({{ s.created_at[:10] }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Severity Filter -->
+            <div class="col-md-3">
+                <label class="form-label small text-muted fw-semibold mb-1">Severity Level</label>
+                <select name="severity" class="form-select form-select-sm threat-input" onchange="this.form.submit()">
+                    <option value="ALL" {% if severity_filter == 'ALL' %}selected{% endif %}>All Severities</option>
+                    <option value="Critical" {% if severity_filter == 'Critical' %}selected{% endif %}>Critical</option>
+                    <option value="High" {% if severity_filter == 'High' %}selected{% endif %}>High</option>
+                    <option value="Medium" {% if severity_filter == 'Medium' %}selected{% endif %}>Medium</option>
+                    <option value="Low" {% if severity_filter == 'Low' %}selected{% endif %}>Low</option>
+                    <option value="Informational" {% if severity_filter == 'Informational' %}selected{% endif %}>Informational</option>
+                </select>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="col-md-3">
+                <label class="form-label small text-muted fw-semibold mb-1">Category</label>
+                <select name="category" class="form-select form-select-sm threat-input" onchange="this.form.submit()">
+                    <option value="ALL" {% if category_filter == 'ALL' %}selected{% endif %}>All Categories</option>
+                    {% for c in categories %}
+                        <option value="{{ c }}" {% if category_filter == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Search Filter -->
+            <div class="col-md-3">
+                <label class="form-label small text-muted fw-semibold mb-1">Keyword Search</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q" class="form-control threat-input" placeholder="Search title, evidence..." value="{{ search_query }}">
+                    <button type="submit" class="btn btn-threat-primary btn-sm">Filter</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Findings List -->
+{% if findings %}
+    <div class="d-flex flex-column gap-3">
+        {% for f in findings %}
+            <div class="threat-card mb-0">
+                <div class="threat-card-header py-2 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge-sev badge-sev-{{ f.severity|lower }}">{{ f.severity }}</span>
+                        <code class="text-dark bg-light px-2 py-1 rounded border">{{ f.finding_id or f.id }}</code>
+                        <span class="fw-bold text-dark fs-6">{{ f.title }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">
+                            <i class="bi bi-shield-check text-primary me-1"></i> Confidence: {{ f.confidence|default('High') }}
+                        </span>
+                        <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">
+                            <i class="bi bi-tag me-1"></i> {{ f.category }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="threat-card-body p-3">
+                    <div class="row g-3">
+                        <!-- Evidence & Explanation -->
+                        <div class="col-lg-7">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">
+                                Observable Evidence
+                            </div>
+                            <pre class="code-preview mb-3">{{ f.evidence }}</pre>
+
+                            <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">
+                                Technical Explanation
+                            </div>
+                            <p class="text-dark small mb-3">{{ f.explanation }}</p>
+
+                            <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">
+                                Potential Impact
+                            </div>
+                            <div class="p-2 rounded bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger small">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ f.potential_impact }}
+                            </div>
+                        </div>
+
+                        <!-- Remediation Guidance & Target Metadata -->
+                        <div class="col-lg-5 border-start-lg ps-lg-3">
+                            <div class="p-3 bg-light rounded border h-100 d-flex flex-direction-column justify-content-between">
+                                <div>
+                                    <div class="text-muted small fw-semibold text-uppercase mb-2" style="font-size: 0.72rem;">
+                                        <i class="bi bi-tools text-primary me-1"></i> Recommended Remediation
+                                    </div>
+                                    <p class="small text-dark mb-3" style="white-space: pre-wrap;">{{ f.remediation }}</p>
+                                </div>
+
+                                <div class="pt-2 border-top text-muted small" style="font-size: 0.74rem;">
+                                    <div><strong>Host:</strong> {{ f.domain }}</div>
+                                    <div><strong>Detected:</strong> {{ f.detection_timestamp or 'Timestamp recorded' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="bi bi-check2-circle text-success"></i></div>
+        <h4 class="empty-state-title">No Findings Match Your Filters</h4>
+        <p class="empty-state-desc">Try resetting your severity, category, or search filters above, or initiate a new website audit.</p>
+        <a href="{{ url_for('findings_view') }}" class="btn btn-threat-secondary">
+            Reset Filters
+        </a>
+    </div>
+{% endif %}
+{% endblock %}

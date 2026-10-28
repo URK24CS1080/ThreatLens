@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}About ThreatLens — Architecture, Methodology & Viva Guide{% endblock %}
+{% block breadcrumb %}About ThreatLens{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <!-- Hero Header -->
+        <div class="threat-card p-4 p-lg-5 mb-4 text-center">
+            <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="ThreatLens Logo" width="60" height="60" class="mb-3">
+            <h2 class="fw-bold mb-2 text-dark" style="font-size: 1.7rem;">ThreatLens Platform</h2>
+            <p class="text-muted mx-auto" style="max-width: 680px; font-size: 0.95rem;">
+                A Web-Based Security Reconnaissance and AI-Powered Threat Intelligence Platform.
+                Engineered for college Web Technology and Cybersecurity capstone evaluations.
+            </p>
+            <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2">Python 3.13</span>
+                <span class="badge bg-secondary bg-opacity-10 text-secondary border px-3 py-2">Flask 3.0</span>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2">MongoDB Storage</span>
+                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-3 py-2">AI Security Analyst</span>
+                <span class="badge bg-dark text-white px-3 py-2">ReportLab PDF</span>
+            </div>
+        </div>
+
+        <!-- 1. System Architecture & Data Flow -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-diagram-3 text-primary"></i> 1. Modular Application Architecture & Data Flow
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                <p class="text-muted small">
+                    ThreatLens is structured into decoupled, single-responsibility modules ensuring defensive security,
+                    anti-SSRF validation, persistent database operations, and explainable AI reporting:
+                </p>
+
+                <div class="p-3 bg-light rounded border font-monospace text-dark small mb-3" style="font-size: 0.78rem; line-height: 1.6;">
+[Web Browser Client] &rarr; (POST /scan or /api/scan)<br>
+&nbsp;&nbsp;&darr;<br>
+[SSRF Guard (ssrf_guard.py)] &rarr; DNS resolution &bull; RFC-1918 Private IP & Cloud Metadata Filter (169.254.169.254)<br>
+&nbsp;&nbsp;&darr;<br>
+[Safe Network Client] &rarr; Streaming fetch with 2MB ceiling &bull; 6s Timeout &bull; Per-redirect hop re-validation<br>
+&nbsp;&nbsp;&darr;<br>
++---------------------------------------------------------------------------------------------------------+<br>
+| Concurrent Analysis Subsystems:                                                                         |<br>
+| 1. Reconnaissance (reconnaissance.py) &rarr; DNS records (A/MX/NS/TXT), HTTP redirects, technology stack   |<br>
+| 2. Security Auditor (security_checks.py) &rarr; CSP, HSTS, X-Content-Type, X-Frame, cookies, forms        |<br>
+| 3. Port Discovery (port_scanner.py) &rarr; Nmap (-sV) or safe TCP socket handshake (only with consent)   |<br>
+| 4. Threat Intelligence (threat_intelligence.py) &rarr; URLhaus malware database, Shannon entropy, Punycode|<br>
+| 5. AI Explainer (ai_explainer.py) &rarr; Gemini 1.5 Flash / OpenAI / Built-in deterministic security model|<br>
++---------------------------------------------------------------------------------------------------------+<br>
+&nbsp;&nbsp;&darr;<br>
+[Dual Persistence Engine (database/)] &rarr; Primary: MongoDB (4 collections) | Resilient Fallback: SQLite<br>
+&nbsp;&nbsp;&darr;<br>
+[Presentation & Export] &rarr; Web UI Dashboard & Findings &bull; ReportLab Two-Pass Numbered PDF Generation
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. MongoDB Database Design -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-database text-primary"></i> 2. MongoDB Document Schema Design
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                <p class="text-muted small mb-3">
+                    As required for college evaluation and database screenshots, ThreatLens organizes assessment data into 
+                    four relational-free, document-oriented collections within the <code>threatlens</code> database:
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border bg-light h-100">
+                            <h6 class="fw-bold text-dark mb-1"><code>scans</code> Collection</h6>
+                            <p class="text-muted small mb-2">Main audit header document with timestamps, calculated score, letter grade, duration, and completed checks.</p>
+                            <code class="d-block small text-muted">Indexes: id (unique), created_at (desc), domain, status</code>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border bg-light h-100">
+                            <h6 class="fw-bold text-dark mb-1"><code>findings</code> Collection</h6>
+                            <p class="text-muted small mb-2">Individual configuration findings with unique ID (e.g. TL-HDR-001), severity, confidence, evidence, impact, and remediation.</p>
+                            <code class="d-block small text-muted">Indexes: scan_id, severity, category, finding_id</code>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border bg-light h-100">
+                            <h6 class="fw-bold text-dark mb-1"><code>threat_intelligence_results</code></h6>
+                            <p class="text-muted small mb-2">External feed query logs (abuse.ch URLhaus, Google Safe Browsing, Shannon entropy, homoglyph indicators).</p>
+                            <code class="d-block small text-muted">Indexes: scan_id, domain, lookup_timestamp</code>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border bg-light h-100">
+                            <h6 class="fw-bold text-dark mb-1"><code>ai_analyses</code> Collection</h6>
+                            <p class="text-muted small mb-2">Synthesized executive summaries, risk prioritization queues, and natural-language narrative reports.</p>
+                            <code class="d-block small text-muted">Indexes: scan_id, created_at</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Security Engineering & Anti-SSRF Defenses -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-shield-lock text-success"></i> 3. Security Engineering & Defense-in-Depth
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                <ul class="text-dark small lh-lg mb-0">
+                    <li><strong>Strict Anti-SSRF Guardrails:</strong> Accepts only <code>http://</code> and <code>https://</code>. Resolves hostnames to IP addresses before connecting and blocks loopback (<code>127.0.0.0/8</code>), private ranges (RFC-1918 <code>10.0.0.0/8</code>, <code>172.16.0.0/12</code>, <code>192.168.0.0/16</code>), link-local (<code>169.254.0.0/16</code>), and AWS/GCP cloud metadata services (<code>169.254.169.254</code>).</li>
+                    <li><strong>Redirect Re-Validation:</strong> Re-runs the SSRF verification on every redirect hop to prevent open-redirect exploitation to internal endpoints.</li>
+                    <li><strong>Resource Quotas:</strong> Enforces a strict 6-second connection timeout and a 2 MB content download limit to prevent DoS attacks via connection exhaustion or decompression bombs.</li>
+                    <li><strong>Safe Subprocess Handling:</strong> Executes Nmap via <code>subprocess</code> with argument lists and shell execution disabled, preventing command injection.</li>
+                    <li><strong>CSRF & Parameterized Queries:</strong> Enforces CSRF tokens across all form submissions and uses parameterized queries to eliminate SQL injection.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 4. College Project Viva Question & Answer Guide -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-mortarboard text-primary"></i> 4. College Project Viva Voce Preparation Guide
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                <div class="accordion" id="vivaAccordion">
+                    <div class="accordion-item border-0 mb-2">
+                        <h2 class="accordion-header" id="q1">
+                            <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#ans1">
+                                <strong>Q1: Why did you build ThreatLens instead of using standard scanners like OWASP ZAP or Burp Suite?</strong>
+                            </button>
+                        </h2>
+                        <div id="ans1" class="accordion-collapse collapse" data-bs-parent="#vivaAccordion">
+                            <div class="accordion-body small text-muted">
+                                <em>Answer:</em> Tools like ZAP and Burp Suite are penetration testing tools designed for aggressive, intrusive testing requiring installation and significant security knowledge. ThreatLens is a web-based, non-destructive platform tailored for reconnaissance and threat correlation. It explains configuration weaknesses in plain English, integrates external malware reputation databases, persists structured records in MongoDB, and generates executive PDF reports suitable for stakeholders.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 mb-2">
+                        <h2 class="accordion-header" id="q2">
+                            <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#ans2">
+                                <strong>Q2: How does the SSRF Guard prevent attackers from pivoting into private networks?</strong>
+                            </button>
+                        </h2>
+                        <div id="ans2" class="accordion-collapse collapse" data-bs-parent="#vivaAccordion">
+                            <div class="accordion-body small text-muted">
+                                <em>Answer:</em> Before making any HTTP request, ThreatLens parses the target URL, extracts the hostname, and performs DNS resolution using <code>socket.getaddrinfo()</code>. The resulting IP address is checked against Python's <code>ipaddress</code> module to verify it is not private, loopback, link-local, or cloud metadata (<code>169.254.169.254</code>). Furthermore, we disable automatic HTTP redirects and re-validate every redirect hop manually.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 mb-2">
+                        <h2 class="accordion-header" id="q3">
+                            <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#ans3">
+                                <strong>Q3: How is MongoDB utilized in the project?</strong>
+                            </button>
+                        </h2>
+                        <div id="ans3" class="accordion-collapse collapse" data-bs-parent="#vivaAccordion">
+                            <div class="accordion-body small text-muted">
+                                <em>Answer:</em> MongoDB serves as our primary document database. It stores application records across four indexed collections: <code>scans</code> (audit session metadata), <code>findings</code> (individual security weaknesses with remediation), <code>threat_intelligence_results</code> (feed lookup logs), and <code>ai_analyses</code> (executive narrative reports). We also implemented an automatic migration layer that imports historical records and provides SQLite fallback if MongoDB is temporarily unreachable.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0">
+                        <h2 class="accordion-header" id="q4">
+                            <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#ans4">
+                                <strong>Q4: How does the AI Security Analyst ensure it doesn't hallucinate vulnerabilities?</strong>
+                            </button>
+                        </h2>
+                        <div id="ans4" class="accordion-collapse collapse" data-bs-parent="#vivaAccordion">
+                            <div class="accordion-body small text-muted">
+                                <em>Answer:</em> The AI module operates exclusively on verified scanner findings passed as structured parameters. All untrusted inputs (headers, page titles) are sanitized against prompt injection. Furthermore, if an external API key is not present, ThreatLens uses its deterministic, rule-based cybersecurity engine to synthesize structured executive reports without inventing unobserved findings.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

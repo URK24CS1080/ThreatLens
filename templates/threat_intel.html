@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Threat Intelligence Correlator — ThreatLens{% endblock %}
+{% block breadcrumb %}Threat Intelligence{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <!-- Top Query Form Card -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <div>
+                    <h3 class="threat-card-title">
+                        <i class="bi bi-radar text-primary"></i> Threat Intelligence Database Lookup
+                    </h3>
+                    <p class="text-muted small mb-0">Cross-reference domains and URLs against malware repositories, reputation feeds, and DGA heuristics.</p>
+                </div>
+            </div>
+            <div class="threat-card-body p-4">
+                <form action="{{ url_for('threat_intel_view') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-white text-muted">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="target" class="form-control threat-input" 
+                               placeholder="Enter domain or URL (e.g., example.com, suspicious-domain.top)" 
+                               value="{{ target_query or '' }}" required autocomplete="off">
+                        <button type="submit" class="btn btn-threat-primary px-4">
+                            <i class="bi bi-radar"></i> Query Feeds
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Educational Legal Disclaimer -->
+                <div class="alert alert-secondary border mt-3 mb-0 py-2 small" style="font-size: 0.78rem;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    <strong>Defensive Audit Note:</strong> Technical threat matches reflect external database indicators at the time of execution.
+                    A database match is evidence of a reported threat indicator, not conclusive proof of criminal intent.
+                </div>
+            </div>
+        </div>
+
+        {% if result %}
+            <!-- Lookup Results Container -->
+            <div class="threat-card mb-4">
+                <div class="threat-card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h4 class="threat-card-title">
+                            Threat Intelligence Assessment: <span class="text-primary">{{ target_query }}</span>
+                        </h4>
+                        <span class="text-muted small">Lookup Timestamp: {{ result.timestamp }}</span>
+                    </div>
+                    <div>
+                        {% if result.any_match_found %}
+                            <span class="badge bg-danger fs-6 px-3 py-1">Threat Indicator Detected</span>
+                        {% else %}
+                            <span class="badge bg-success bg-opacity-10 text-success fs-6 px-3 py-1 border border-success border-opacity-25">Clean / No Match</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="threat-card-body p-4">
+                    <div class="row g-4">
+                        <!-- URLhaus Database Feed -->
+                        {% set uh = result.providers.urlhaus %}
+                        <div class="col-md-6">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="fw-bold text-dark small">
+                                        <i class="bi bi-bug text-danger me-1"></i> abuse.ch URLhaus Feed
+                                    </span>
+                                    <span class="status-pill {% if uh.match_found %}status-pill-warning{% else %}status-pill-success{% endif %}">
+                                        {{ uh.status }}
+                                    </span>
+                                </div>
+                                <p class="text-muted small mb-0">{{ uh.details }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Google Safe Browsing Feed -->
+                        {% set gsb = result.providers.google_safe_browsing %}
+                        <div class="col-md-6">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="fw-bold text-dark small">
+                                        <i class="bi bi-google text-primary me-1"></i> Google Safe Browsing v4
+                                    </span>
+                                    <span class="status-pill {% if gsb.match_found %}status-pill-warning{% elif gsb.status == 'No Threat Detected' %}status-pill-success{% else %}status-pill-secondary{% endif %}">
+                                        {{ gsb.status }}
+                                    </span>
+                                </div>
+                                <p class="text-muted small mb-0">{{ gsb.details }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Domain Heuristics & Shannon Entropy -->
+                        {% set heur = result.providers.domain_heuristics %}
+                        <div class="col-12">
+                            <div class="p-3 rounded border bg-light">
+                                <h6 class="fw-bold text-dark mb-2">
+                                    <i class="bi bi-calculator text-primary me-1"></i> Algorithmic Heuristics (DGA & Homoglyphs)
+                                </h6>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <div class="text-muted small">Shannon Entropy</div>
+                                        <div class="fw-bold text-dark fs-5">{{ heur.entropy|default(0) }}</div>
+                                        <small class="text-muted">High entropy (&gt;3.8) suggests randomized DGA naming</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-muted small">Punycode / Homograph</div>
+                                        <div class="fw-bold text-dark fs-5">
+                                            {% if heur.has_punycode %}
+                                                <span class="text-warning">Detected (<code>xn--</code>)</span>
+                                            {% else %}
+                                                <span class="text-success">Clean (Standard ASCII)</span>
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">Checks for character visual spoofing</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-muted small">Heuristic Indicators</div>
+                                        <div class="fw-bold text-dark fs-5">{{ heur.indicators|length }} Noted</div>
+                                        <small class="text-muted">Contextual structural flags</small>
+                                    </div>
+                                </div>
+
+                                {% if heur.indicators %}
+                                    <div class="mt-3 pt-2 border-top">
+                                        <ul class="list-unstyled mb-0 small">
+                                            {% for ind in heur.indicators %}
+                                                <li class="d-flex align-items-center gap-2 mb-1">
+                                                    <span class="badge-sev badge-sev-{{ ind.severity|lower }}">{{ ind.severity }}</span>
+                                                    <strong class="text-dark">{{ ind.type }}:</strong>
+                                                    <span class="text-muted">{{ ind.detail }}</span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Recent Audit Shortcuts -->
+        {% if recent_scans %}
+            <div class="threat-card">
+                <div class="threat-card-header">
+                    <h4 class="threat-card-title">
+                        <i class="bi bi-clock-history text-secondary"></i> Recently Scanned Targets
+                    </h4>
+                </div>
+                <div class="threat-card-body p-3">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for s in recent_scans %}
+                            <button type="button" class="btn btn-sm btn-threat-secondary" 
+                                    onclick="document.querySelector('input[name=target]').value='{{ s.domain }}'">
+                                <i class="bi bi-globe me-1"></i> {{ s.domain }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+# ThreatLens: Web-Based Security Reconnaissance and AI-Powered Threat Intelligence Platform
+# Python Dependencies
+
+Flask>=3.0.0
+Flask-WTF>=1.2.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+dnspython>=2.6.0
+reportlab>=4.2.0
+python-dotenv>=1.0.0
+python-nmap>=0.7.1
+cryptography>=42.0.0
+pymongo>=4.6.0

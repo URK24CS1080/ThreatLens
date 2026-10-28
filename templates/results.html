@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block title %}Scan Results: {{ scan.domain }} — ThreatLens{% endblock %}
+{% block breadcrumb %}
+    <a href="{{ url_for('history') }}">Scans</a> <span class="breadcrumb-separator">/</span> {{ scan.domain }}
+{% endblock %}
+
+{% block content %}
+<!-- Top Target Summary Header Card -->
+<div class="threat-card mb-4">
+    <div class="threat-card-body p-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center flex-wrap gap-3 mb-2">
+                    <h2 class="fw-bold mb-0 text-dark" style="font-size: 1.6rem;">{{ scan.domain }}</h2>
+                    <span class="badge {% if scan.risk_grade in ('A','B') %}bg-success{% elif scan.risk_grade == 'C' %}bg-warning text-dark{% else %}bg-danger{% endif %} fs-6 px-3 py-1">
+                        Score: {{ scan.risk_score }}/100 &bull; Grade {{ scan.risk_grade }}
+                    </span>
+                    <span class="status-pill status-pill-success">
+                        <i class="bi bi-check2-all"></i> Assessment Completed
+                    </span>
+                </div>
+
+                <div class="d-flex flex-wrap gap-3 text-muted small align-items-center mt-3">
+                    <span><i class="bi bi-link-45deg text-primary"></i> <a href="{{ scan.target_url }}" target="_blank" rel="noopener" class="text-decoration-none text-muted">{{ scan.target_url }}</a></span>
+                    <span><i class="bi bi-hdd-network text-primary"></i> IP: <code class="text-dark">{{ scan.ip_address or 'Unknown' }}</code></span>
+                    <span><i class="bi bi-clock text-primary"></i> {{ scan.created_at }}</span>
+                    <span><i class="bi bi-stopwatch text-primary"></i> {{ scan.scan_duration_seconds }}s elapsed</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap justify-content-lg-end gap-2">
+                    <a href="{{ url_for('report_viewer', scan_id=scan.id) }}" class="btn btn-sm btn-threat-secondary">
+                        <i class="bi bi-eye"></i> Report Viewer
+                    </a>
+                    <a href="{{ url_for('download_pdf', scan_id=scan.id) }}" class="btn btn-sm btn-threat-primary">
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF
+                    </a>
+                    <a href="{{ url_for('compare_view', scan_b=scan.id) }}" class="btn btn-sm btn-outline-secondary" title="Compare against previous scan">
+                        <i class="bi bi-arrow-left-right"></i> Compare
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Severity KPI Breakdown Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-box" style="border-left: 3px solid var(--sev-critical-solid);">
+            <span class="metric-label">Critical</span>
+            <span class="metric-value text-danger">{{ scan.critical_count }}</span>
+            <span class="metric-subtext">Immediate action</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-box" style="border-left: 3px solid var(--sev-high-solid);">
+            <span class="metric-label">High Severity</span>
+            <span class="metric-value" style="color: var(--sev-high-text);">{{ scan.high_count }}</span>
+            <span class="metric-subtext">Defense gaps</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-box" style="border-left: 3px solid var(--sev-medium-solid);">
+            <span class="metric-label">Medium</span>
+            <span class="metric-value" style="color: var(--sev-medium-text);">{{ scan.medium_count }}</span>
+            <span class="metric-subtext">Defensive headers</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-box" style="border-left: 3px solid var(--sev-low-solid);">
+            <span class="metric-label">Low Risk</span>
+            <span class="metric-value" style="color: var(--sev-low-text);">{{ scan.low_count }}</span>
+            <span class="metric-subtext">Configuration hygiene</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-box" style="border-left: 3px solid var(--sev-info-solid);">
+            <span class="metric-label">Informational</span>
+            <span class="metric-value text-secondary">{{ scan.info_count }}</span>
+            <span class="metric-subtext">Observable notices</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="metric-box">
+            <span class="metric-label">Total Findings</span>
+            <span class="metric-value text-dark">{{ scan.total_findings }}</span>
+            <span class="metric-subtext">Identified items</span>
+        </div>
+    </div>
+</div>
+
+<!-- Nav Tabs for Sectional Views -->
+<ul class="nav nav-pills mb-4" id="resultsTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="findings-tab" data-bs-toggle="pill" data-bs-target="#findings-pane" type="button" role="tab">
+            <i class="bi bi-exclamation-octagon me-1"></i> Security Findings ({{ scan.findings|length }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="recon-tab" data-bs-toggle="pill" data-bs-target="#recon-pane" type="button" role="tab">
+            <i class="bi bi-diagram-3 me-1"></i> Reconnaissance & Infrastructure
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="ai-tab" data-bs-toggle="pill" data-bs-target="#ai-pane" type="button" role="tab">
+            <i class="bi bi-cpu me-1"></i> AI Security Analysis
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="threat-tab" data-bs-toggle="pill" data-bs-target="#threat-pane" type="button" role="tab">
+            <i class="bi bi-radar me-1"></i> Threat Intelligence
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="ports-tab" data-bs-toggle="pill" data-bs-target="#ports-pane" type="button" role="tab">
+            <i class="bi bi-ethernet me-1"></i> Port Probing ({{ scan.recon.open_ports|default([])|length }})
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content Panes -->
+<div class="tab-content" id="resultsTabContent">
+    <!-- PANE 1: SECURITY FINDINGS -->
+    <div class="tab-pane fade show active" id="findings-pane" role="tabpanel">
+        {% if scan.findings %}
+            <div class="d-flex flex-column gap-3">
+                {% for f in scan.findings %}
+                    <div class="threat-card mb-0">
+                        <div class="threat-card-header d-flex align-items-center justify-content-between py-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge-sev badge-sev-{{ f.severity|lower }}">
+                                    {{ f.severity }}
+                                </span>
+                                <span class="badge bg-light text-dark border font-monospace" style="font-size: 0.75rem;">
+                                    {{ f.finding_id or f.id or ('TL-SEC-' ~ loop.index) }}
+                                </span>
+                                <span class="fw-bold text-dark" style="font-size: 0.95rem;">
+                                    {{ f.title }}
+                                </span>
+                            </div>
+                            <span class="text-muted small">
+                                <i class="bi bi-tag me-1"></i> {{ f.category }}
+                            </span>
+                        </div>
+                        <div class="threat-card-body p-3">
+                            <div class="row g-3">
+                                <div class="col-md-7">
+                                    <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">Evidence & Detection</div>
+                                    <pre class="code-preview mb-3">{{ f.evidence }}</pre>
+
+                                    <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">Explanation</div>
+                                    <p class="text-dark small mb-2">{{ f.explanation }}</p>
+
+                                    <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">Potential Impact</div>
+                                    <p class="text-danger small mb-0">{{ f.potential_impact }}</p>
+                                </div>
+                                <div class="col-md-5 border-start-md ps-md-3">
+                                    <div class="p-3 bg-light rounded border h-100">
+                                        <div class="text-muted small fw-semibold text-uppercase mb-2" style="font-size: 0.72rem;">
+                                            <i class="bi bi-tools text-primary me-1"></i> Recommended Remediation
+                                        </div>
+                                        <p class="small text-dark mb-0" style="white-space: pre-wrap;">{{ f.remediation }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon text-success"><i class="bi bi-shield-check"></i></div>
+                <h4 class="empty-state-title">No Security Weaknesses Detected</h4>
+                <p class="empty-state-desc">The passive audit identified no missing defensive headers or observable misconfigurations.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- PANE 2: RECONNAISSANCE & INFRASTRUCTURE -->
+    <div class="tab-pane fade" id="recon-pane" role="tabpanel">
+        <div class="row g-4">
+            <!-- Web Server & Headers -->
+            <div class="col-lg-6">
+                <div class="threat-card h-100">
+                    <div class="threat-card-header">
+                        <h4 class="threat-card-title"><i class="bi bi-server text-primary"></i> HTTP Server & Response Details</h4>
+                    </div>
+                    <div class="threat-card-body p-3">
+                        <table class="threat-table">
+                            <tbody>
+                                <tr>
+                                    <td class="text-muted fw-semibold" style="width: 35%;">HTTP Status</td>
+                                    <td><span class="badge bg-secondary">{{ scan.recon.http_status or 'N/A' }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Page Title</td>
+                                    <td class="fw-medium text-dark">{{ scan.recon.page_title or 'None Detected' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Server Banner</td>
+                                    <td><code>{{ scan.recon.server_header or 'Suppressed / Hidden' }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">HTTPS Enforced</td>
+                                    <td>
+                                        {% if scan.recon.https_enabled %}
+                                            <span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Enabled</span>
+                                        {% else %}
+                                            <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Plain HTTP</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Detected Tech</td>
+                                    <td>
+                                        {% if scan.recon.technologies %}
+                                            {% for t in scan.recon.technologies %}
+                                                <span class="badge bg-light text-dark border">{{ t.name }}</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted small">None fingerprinted</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        {% if scan.recon.redirect_chain %}
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="text-muted small fw-semibold text-uppercase mb-2" style="font-size: 0.72rem;">Redirect Trace</div>
+                                <div class="d-flex flex-column gap-1 small">
+                                    {% for r in scan.recon.redirect_chain %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-info bg-opacity-10 text-info">{{ r.status_code }}</span>
+                                            <span class="text-truncate text-muted" style="max-width: 400px;">{{ r.url }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SSL/TLS Certificate -->
+            <div class="col-lg-6">
+                <div class="threat-card h-100">
+                    <div class="threat-card-header">
+                        <h4 class="threat-card-title"><i class="bi bi-lock text-primary"></i> SSL/TLS Certificate Inspection</h4>
+                    </div>
+                    <div class="threat-card-body p-3">
+                        {% set tls = scan.recon.tls_cert|default({}) %}
+                        {% if tls.has_tls %}
+                            <table class="threat-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-muted fw-semibold" style="width: 35%;">Issuer</td>
+                                        <td class="fw-semibold text-dark">{{ tls.issuer or 'Unknown' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Subject CN</td>
+                                        <td><code>{{ tls.subject_cn or 'Unknown' }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Protocol Version</td>
+                                        <td><span class="badge bg-light text-dark border">{{ tls.tls_version }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Cipher Suite</td>
+                                        <td><code style="font-size: 0.78rem;">{{ tls.cipher_suite }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Validity Window</td>
+                                        <td class="small">{{ tls.valid_from }} to {{ tls.valid_to }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Days Remaining</td>
+                                        <td>
+                                            {% if tls.days_left and tls.days_left > 30 %}
+                                                <span class="badge bg-success bg-opacity-10 text-success">{{ tls.days_left }} days</span>
+                                            {% elif tls.days_left and tls.days_left > 0 %}
+                                                <span class="badge bg-warning bg-opacity-25 text-warning">{{ tls.days_left }} days (Expiring Soon)</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Expired</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p class="text-muted small mb-0 py-3 text-center">
+                                No SSL/TLS certificate was bound to port 443 during reconnaissance.
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- DNS Resolution Records -->
+            <div class="col-12">
+                <div class="threat-card">
+                    <div class="threat-card-header">
+                        <h4 class="threat-card-title"><i class="bi bi-diagram-2 text-primary"></i> DNS Records Resolution</h4>
+                    </div>
+                    <div class="threat-card-body p-3">
+                        {% set dns = scan.recon.dns_records|default({}) %}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">A Records (IPv4)</div>
+                                <div class="p-2 rounded bg-light border small">
+                                    {% for ip in dns.get('A', []) %}
+                                        <div><code>{{ ip }}</code></div>
+                                    {% else %}
+                                        <span class="text-muted">None resolved</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">MX Records (Mail Exchangers)</div>
+                                <div class="p-2 rounded bg-light border small">
+                                    {% for mx in dns.get('MX', []) %}
+                                        <div><code>{{ mx }}</code></div>
+                                    {% else %}
+                                        <span class="text-muted">No MX records</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.72rem;">NS Records (Nameservers)</div>
+                                <div class="p-2 rounded bg-light border small">
+                                    {% for ns in dns.get('NS', []) %}
+                                        <div><code>{{ ns }}</code></div>
+                                    {% else %}
+                                        <span class="text-muted">No NS records</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANE 3: AI SECURITY ANALYSIS -->
+    <div class="tab-pane fade" id="ai-pane" role="tabpanel">
+        <div class="threat-card">
+            <div class="threat-card-header d-flex align-items-center justify-content-between">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-cpu text-primary"></i> AI Security Analyst Synthesis
+                </h4>
+                <a href="{{ url_for('ai_analysis_view', scan_id=scan.id) }}" class="btn btn-sm btn-threat-secondary">
+                    Open Dedicated AI View
+                </a>
+            </div>
+            <div class="threat-card-body p-4">
+                {% set ai = scan.ai_analysis|default({}) %}
+                <div class="alert alert-info border d-flex align-items-center gap-2 mb-4" style="font-size: 0.85rem;">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span>
+                        AI Engine: <strong>{{ ai.get('provider', 'builtin')|capitalize }}</strong>.
+                        Analyzes real verified findings to assist developers with remediation prioritizations.
+                    </span>
+                </div>
+
+                <h5 class="fw-bold text-dark mb-2">Executive Summary</h5>
+                <p class="text-dark small mb-4" style="line-height: 1.6;">
+                    {{ ai.get('executive_summary') or scan.recon.get('ai_explanation') or 'AI executive summary generated upon request.' }}
+                </p>
+
+                {% if ai.get('risk_prioritization') %}
+                    <h5 class="fw-bold text-dark mb-2">Risk Prioritization Queue</h5>
+                    <div class="table-responsive mb-4">
+                        <table class="threat-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Priority Finding</th>
+                                    <th>Severity</th>
+                                    <th>Remediation Urgency</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in ai.get('risk_prioritization')[:5] %}
+                                    <tr>
+                                        <td><code>{{ r.finding_id }}</code></td>
+                                        <td class="fw-semibold text-dark">{{ r.title }}</td>
+                                        <td><span class="badge-sev badge-sev-{{ r.severity|lower }}">{{ r.severity }}</span></td>
+                                        <td><span class="badge bg-light text-dark border">{{ r.urgency }}</span></td>
+                                        <td class="small">{{ r.action }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- PANE 4: THREAT INTELLIGENCE -->
+    <div class="tab-pane fade" id="threat-pane" role="tabpanel">
+        <div class="threat-card">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-radar text-primary"></i> Threat Database Lookups & Heuristics
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                {% set ti = scan.recon.threat_intel|default({}) %}
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border bg-light">
+                            <h6 class="fw-bold text-dark mb-2">abuse.ch URLhaus Query</h6>
+                            <p class="text-muted small mb-2">Checks if domain is listed in active malware distribution repositories.</p>
+                            <div>
+                                Status: <span class="badge bg-success bg-opacity-10 text-success">No Threat Match Found</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border bg-light">
+                            <h6 class="fw-bold text-dark mb-2">Domain Heuristics (Entropy & Punycode)</h6>
+                            <p class="text-muted small mb-2">Evaluates domain name randomness and homoglyph spoofing vectors.</p>
+                            <div>
+                                Entropy: <code class="text-dark">{{ ti.get('heuristics', {}).get('entropy', 0) }}</code>
+                                &bull; Punycode: 
+                                {% if ti.get('heuristics', {}).get('has_punycode') %}
+                                    <span class="badge bg-warning">Present</span>
+                                {% else %}
+                                    <span class="badge bg-success bg-opacity-10 text-success">Clean (ASCII)</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANE 5: PORT PROBING -->
+    <div class="tab-pane fade" id="ports-pane" role="tabpanel">
+        <div class="threat-card">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-ethernet text-primary"></i> Service & Listener Discovery
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                {% set ports = scan.recon.open_ports|default([]) %}
+                {% if not scan.port_scan_enabled %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon text-muted"><i class="bi bi-shield-lock"></i></div>
+                        <h4 class="empty-state-title">Port Scanning Not Authorized</h4>
+                        <p class="empty-state-desc">
+                            Port discovery was disabled during scan configuration. Active service probing is only performed
+                            when explicitly authorized by the user.
+                        </p>
+                    </div>
+                {% elif ports %}
+                    <div class="table-responsive">
+                        <table class="threat-table">
+                            <thead>
+                                <tr>
+                                    <th>Port</th>
+                                    <th>Service Name</th>
+                                    <th>State</th>
+                                    <th>Version / Banner Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in ports %}
+                                    <tr>
+                                        <td><code>{{ p.port }}</code></td>
+                                        <td class="fw-semibold text-dark">{{ p.service }}</td>
+                                        <td><span class="badge bg-success bg-opacity-10 text-success">{{ p.state|upper }}</span></td>
+                                        <td class="small">{{ p.version or 'Reachable TCP listener' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon text-secondary"><i class="bi bi-check-circle"></i></div>
+                        <h4 class="empty-state-title">No Common Ports Reachable</h4>
+                        <p class="empty-state-desc">The authorized probe completed without identifying open listeners on probed standard ports.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

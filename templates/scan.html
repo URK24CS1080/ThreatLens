@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}New Website Security Assessment — ThreatLens{% endblock %}
+{% block breadcrumb %}New Website Scan{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-9">
+        <div class="threat-card">
+            <div class="threat-card-header">
+                <div>
+                    <h3 class="threat-card-title">
+                        <i class="bi bi-shield-plus text-primary"></i> Launch Website Security Reconnaissance
+                    </h3>
+                    <p class="text-muted small mb-0">Configure audit parameters, authorization consents, and scanning scope.</p>
+                </div>
+            </div>
+            <div class="threat-card-body p-4">
+                <form id="scanForm" action="{{ url_for('scan') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Target URL Input -->
+                    <div class="mb-4">
+                        <label for="url" class="form-label fw-semibold text-dark">
+                            Target Website URL or Hostname <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-white text-muted">
+                                <i class="bi bi-globe2"></i>
+                            </span>
+                            <input type="text" id="url" name="url" class="form-control threat-input" 
+                                   placeholder="https://example.com or scanme.nmap.org" 
+                                   value="{{ target_url or '' }}" required autocomplete="off">
+                        </div>
+                        <div class="form-text text-muted mt-2" style="font-size: 0.8rem;">
+                            <i class="bi bi-shield-lock text-success me-1"></i>
+                            <strong>Anti-SSRF Protection:</strong> Loopback (<code>127.0.0.1</code>), RFC-1918 private ranges 
+                            (<code>10.0.0.0/8</code>, <code>172.16.0.0/12</code>, <code>192.168.0.0/16</code>), link-local, and cloud metadata endpoints (<code>169.254.169.254</code>) are automatically rejected.
+                        </div>
+                    </div>
+
+                    <!-- Recommended Test Targets -->
+                    <div class="mb-4 p-3 bg-light rounded border">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="text-uppercase text-muted fw-semibold" style="font-size: 0.72rem;">Safe Educational Targets:</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-threat-secondary" onclick="document.getElementById('url').value='https://example.com'">
+                                <i class="bi bi-link-45deg me-1"></i> example.com
+                            </button>
+                            <button type="button" class="btn btn-sm btn-threat-secondary" onclick="document.getElementById('url').value='https://scanme.nmap.org'">
+                                <i class="bi bi-terminal me-1"></i> scanme.nmap.org (Official Nmap Test Target)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-threat-secondary" onclick="document.getElementById('url').value='https://owasp.org'">
+                                <i class="bi bi-shield me-1"></i> owasp.org
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Authorized Port & Service Discovery Section -->
+                    <div class="mb-4 p-3 rounded border" style="background-color: #fbfcfe;">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="fw-semibold text-dark">
+                                <i class="bi bi-ethernet text-primary me-1"></i> Authorized Port & Service Discovery
+                            </div>
+                            {% if nmap_available %}
+                                <span class="status-pill status-pill-success">
+                                    <i class="bi bi-check-circle"></i> Nmap Engine Ready
+                                </span>
+                            {% else %}
+                                <span class="status-pill status-pill-secondary">
+                                    <i class="bi bi-plug"></i> Safe Socket Handshake Fallback
+                                </span>
+                            {% endif %}
+                        </div>
+                        <p class="text-muted small mb-3">
+                            Probes a standard list of common web and infrastructure ports to detect reachable services.
+                            <strong>Important:</strong> An open port is not automatically a vulnerability; it reflects an active network listener.
+                        </p>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="authorize_port_scan" name="authorize_port_scan" value="1" onchange="togglePortOptions()">
+                            <label class="form-check-label fw-semibold text-dark small" for="authorize_port_scan">
+                                I confirm authorization to perform service discovery against this target.
+                            </label>
+                        </div>
+
+                        <div id="portOptions" class="ps-3 border-start border-primary border-2" style="display: none;">
+                            <label for="ports" class="form-label small text-muted fw-semibold">
+                                Probed Ports (Comma-separated common ports):
+                            </label>
+                            <input type="text" id="ports" name="ports" class="form-control threat-input form-control-sm mb-1" 
+                                   value="{{ default_ports }}" style="max-width: 480px;">
+                            <div class="text-muted" style="font-size: 0.74rem;">
+                                Standard ports: 21 (FTP), 22 (SSH), 25 (SMTP), 53 (DNS), 80 (HTTP), 110 (POP3), 143 (IMAP), 443 (HTTPS), 3306 (MySQL), 3389 (RDP), 5432 (PostgreSQL), 8080 (HTTP-Alt), 8443 (HTTPS-Alt).
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI & Threat Intelligence Modules Indicator -->
+                    <div class="mb-4 p-3 bg-light rounded border">
+                        <div class="d-flex flex-wrap gap-4 align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-database-check text-success fs-5"></i>
+                                <div>
+                                    <div class="fw-semibold text-dark small">Database Persistence</div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">{{ db_status.active_backend }}</div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-radar text-primary fs-5"></i>
+                                <div>
+                                    <div class="fw-semibold text-dark small">Threat Intelligence</div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">URLhaus + Domain Heuristics + GSB</div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-cpu text-info fs-5"></i>
+                                <div>
+                                    <div class="fw-semibold text-dark small">AI Security Analyst</div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">Automated Executive Report Synthesis</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+                        <a href="{{ url_for('index') }}" class="btn btn-threat-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                        <button type="submit" id="submitBtn" class="btn btn-threat-primary px-4">
+                            <i class="bi bi-play-circle-fill"></i> Execute Assessment
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Interactive Scan Stepper Progress Overlay -->
+                <div id="scanProgressModal" class="d-none mt-4 p-4 border rounded bg-white shadow-sm">
+                    <div class="text-center mb-3">
+                        <div class="spinner-border text-primary mb-2" role="status">
+                            <span class="visually-hidden">Scanning...</span>
+                        </div>
+                        <h5 class="fw-bold mb-1 text-dark">Security Assessment in Progress</h5>
+                        <p class="text-muted small mb-3" id="progressSubtext">Dispatching non-destructive reconnaissance probes...</p>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 25%;"></div>
+                    </div>
+
+                    <div class="list-group list-group-flush small" style="font-size: 0.82rem;">
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2 border-0" id="step1">
+                            <span><i class="bi bi-check-circle text-success me-2"></i> SSRF Guard & IP Range Verification</span>
+                            <span class="badge bg-success bg-opacity-10 text-success">Passed</span>
+                        </div>
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2 border-0" id="step2">
+                            <span><i class="bi bi-hourglass-split text-primary me-2"></i> DNS Records & SSL/TLS Negotiation</span>
+                            <span class="text-muted">Analyzing</span>
+                        </div>
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2 border-0" id="step3">
+                            <span><i class="bi bi-shield-check text-muted me-2"></i> OWASP Headers & Cookie Security Auditing</span>
+                            <span class="text-muted">Queued</span>
+                        </div>
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2 border-0" id="step4">
+                            <span><i class="bi bi-radar text-muted me-2"></i> Threat Database Lookup & Shannon Entropy</span>
+                            <span class="text-muted">Queued</span>
+                        </div>
+                        <div class="list-group-item d-flex align-items-center justify-content-between py-2 border-0" id="step5">
+                            <span><i class="bi bi-cpu text-muted me-2"></i> AI Executive Report Synthesis & MongoDB Persistence</span>
+                            <span class="text-muted">Queued</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePortOptions() {
+        const checkbox = document.getElementById("authorize_port_scan");
+        const options = document.getElementById("portOptions");
+        if (checkbox && options) {
+            options.style.display = checkbox.checked ? "block" : "none";
+        }
+    }
+
+    document.getElementById("scanForm").addEventListener("submit", function() {
+        document.getElementById("submitBtn").disabled = true;
+        document.getElementById("submitBtn").innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing...';
+        
+        const modal = document.getElementById("scanProgressModal");
+        if (modal) {
+            modal.classList.remove("d-none");
+            
+            // Advance visual stepper periodically while backend finishes
+            let width = 25;
+            const bar = document.getElementById("progressBar");
+            const interval = setInterval(function() {
+                if (width < 90) {
+                    width += 15;
+                    bar.style.width = width + "%";
+                } else {
+                    clearInterval(interval);
+                }
+            }, 800);
+        }
+    });
+</script>
+{% endblock %}

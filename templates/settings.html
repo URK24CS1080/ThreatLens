@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Settings & System Configuration — ThreatLens{% endblock %}
+{% block breadcrumb %}Platform Settings & Configuration{% endblock %}
+
+{% block content %}
+<div class="row g-4 justify-content-center">
+    <div class="col-12 col-xl-10">
+        <!-- Top Title Card -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <div>
+                    <h3 class="threat-card-title">
+                        <i class="bi bi-sliders text-primary"></i> System Settings & API Configuration
+                    </h3>
+                    <p class="text-muted small mb-0">
+                        Inspect database persistence, external threat feeds, AI provider keys, and security controls.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Database Integration (MongoDB) Card -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header d-flex align-items-center justify-content-between">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-database-check text-primary"></i> 1. MongoDB Database Storage
+                </h4>
+                <div>
+                    {% if db_status.mongo_connected %}
+                        <span class="status-pill status-pill-success">
+                            <i class="bi bi-check-circle-fill"></i> MongoDB Connected
+                        </span>
+                    {% else %}
+                        <span class="status-pill status-pill-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i> SQLite Fallback Active
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="threat-card-body p-4">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted fw-semibold">Configured MongoDB URI</label>
+                        <input type="text" class="form-control threat-input font-monospace" value="{{ db_status.mongo_uri }}" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted fw-semibold">Target Database Name</label>
+                        <input type="text" class="form-control threat-input" value="{{ db_status.mongo_db_name }}" readonly>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="button" id="testMongoBtn" class="btn btn-threat-primary w-100" onclick="testMongoConnection()">
+                            <i class="bi bi-arrow-repeat me-1"></i> Test Connection
+                        </button>
+                    </div>
+                </div>
+
+                <div id="mongoTestResult" class="d-none alert mb-4 small"></div>
+
+                <!-- MongoDB Collections Counts Matrix -->
+                <h6 class="fw-bold text-dark mb-2">MongoDB Collection Schema & Document Counters</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold">scans</div>
+                            <div class="fs-4 fw-bold text-dark">{{ db_status.mongo_counts.get('scans', 0) }}</div>
+                            <small class="text-muted">Assessment sessions</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold">findings</div>
+                            <div class="fs-4 fw-bold text-dark">{{ db_status.mongo_counts.get('findings', 0) }}</div>
+                            <small class="text-muted">Security observations</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold">threat_intelligence_results</div>
+                            <div class="fs-4 fw-bold text-dark">{{ db_status.mongo_counts.get('threat_intelligence_results', 0) }}</div>
+                            <small class="text-muted">Reputation lookups</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold">ai_analyses</div>
+                            <div class="fs-4 fw-bold text-dark">{{ db_status.mongo_counts.get('ai_analyses', 0) }}</div>
+                            <small class="text-muted">Executive syntheses</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- College Viva Setup Guidance -->
+                <div class="p-3 bg-light rounded border small">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-info-circle text-primary me-1"></i> College Viva MongoDB Setup Instructions:</h6>
+                    <p class="text-muted mb-2">
+                        If running local MongoDB on Windows, open PowerShell as Administrator and run:
+                        <code>net start MongoDB</code> (or run <code>mongod</code>).
+                        Alternatively, use a free cloud cluster from <a href="https://www.mongodb.com/cloud/atlas" target="_blank" rel="noopener">MongoDB Atlas</a> 
+                        and set your connection string in <code>.env</code>:
+                    </p>
+                    <pre class="code-preview mb-2">MONGO_URI=mongodb+srv://&lt;username&gt;:&lt;password&gt;@cluster0.xxxxx.mongodb.net/threatlens</pre>
+                    <p class="text-muted mb-0">
+                        You can also run <code>python database/mongo_cli.py --inspect</code> in your terminal to view collections and take your viva screenshot.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. AI Security Analyst & Threat Intelligence APIs -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-cpu text-primary"></i> 2. External Intelligence & AI Configurations
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                <div class="row g-4">
+                    <!-- Google Gemini -->
+                    <div class="col-md-4">
+                        <div class="p-3 rounded border h-100 bg-light">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-bold text-dark small"><i class="bi bi-gemini text-primary me-1"></i> Google Gemini AI</span>
+                                {% if has_gemini_key %}
+                                    <span class="badge bg-success bg-opacity-10 text-success">Configured</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary">Not Set</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-muted small mb-0">
+                                Generates natural-language cybersecurity summaries via Gemini 1.5 Flash API.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- OpenAI -->
+                    <div class="col-md-4">
+                        <div class="p-3 rounded border h-100 bg-light">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-bold text-dark small"><i class="bi bi-openai text-dark me-1"></i> OpenAI API</span>
+                                {% if has_openai_key %}
+                                    <span class="badge bg-success bg-opacity-10 text-success">Configured</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary">Not Set</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-muted small mb-0">
+                                Optional integration with GPT-4o-mini for executive reporting.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Google Safe Browsing -->
+                    <div class="col-md-4">
+                        <div class="p-3 rounded border h-100 bg-light">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-bold text-dark small"><i class="bi bi-google text-danger me-1"></i> Google Safe Browsing</span>
+                                {% if has_gsb_key %}
+                                    <span class="badge bg-success bg-opacity-10 text-success">Configured</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary">Not Set</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-muted small mb-0">
+                                Queries Google Safe Browsing v4 feed for confirmed threat URLs.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 p-3 bg-white rounded border small text-muted">
+                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                    <strong>ThreatLens Built-in Engine:</strong> Fully operational out of the box with zero external API dependencies.
+                    If external AI keys are omitted, the built-in pedagogical cybersecurity analyst automatically formats executive reports and remediation roadmaps.
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Security Guardrails & Scanning Parameters -->
+        <div class="threat-card mb-4">
+            <div class="threat-card-header">
+                <h4 class="threat-card-title">
+                    <i class="bi bi-shield-check text-primary"></i> 3. Security Controls & Guardrails
+                </h4>
+            </div>
+            <div class="threat-card-body p-4">
+                <div class="table-responsive">
+                    <table class="threat-table">
+                        <thead>
+                            <tr>
+                                <th>Security Control</th>
+                                <th>Setting / Parameter</th>
+                                <th>Enforcement Policy</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-semibold text-dark">Anti-SSRF Protection</td>
+                                <td><span class="badge bg-success bg-opacity-10 text-success">Active & Enforced</span></td>
+                                <td class="small text-muted">Blocks RFC-1918 private IPs, loopback, link-local, and cloud metadata (169.254.169.254).</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold text-dark">Max HTTP Timeout</td>
+                                <td><code>6 seconds</code></td>
+                                <td class="small text-muted">Prevents slowloris and hung connection exhaustion.</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold text-dark">Max Download Size</td>
+                                <td><code>2 MB (2,097,152 bytes)</code></td>
+                                <td class="small text-muted">Protects memory from large payload decompression bombs.</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold text-dark">Port Scanner Engine</td>
+                                <td>
+                                    {% if nmap_available %}
+                                        <span class="badge bg-success bg-opacity-10 text-success">Nmap (-sV Service Detection)</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary">Non-intrusive TCP Socket Connect</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">Requires explicit user authorization before probe dispatch.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function testMongoConnection() {
+        const btn = document.getElementById("testMongoBtn");
+        const alertBox = document.getElementById("mongoTestResult");
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Testing...';
+        
+        fetch("{{ url_for('test_mongo_connection') }}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token() }}"
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Test Connection';
+            alertBox.classList.remove("d-none", "alert-success", "alert-danger");
+            
+            if (data.connected) {
+                alertBox.classList.add("alert-success");
+                alertBox.innerHTML = `<strong><i class="bi bi-check-circle-fill me-1"></i> MongoDB Connection Successful!</strong> Connected to database <code>${data.database}</code>. Total scans: ${data.counts.scans || 0}, findings: ${data.counts.findings || 0}.`;
+            } else {
+                alertBox.classList.add("alert-danger");
+                alertBox.innerHTML = `<strong><i class="bi bi-x-circle-fill me-1"></i> MongoDB Connection Failed:</strong> ${data.error || 'Connection timed out'}. Ensure MongoDB service is running or check MONGO_URI in .env.`;
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Test Connection';
+            alertBox.classList.remove("d-none", "alert-success");
+            alertBox.classList.add("alert-danger");
+            alertBox.innerHTML = `<strong>Error testing connection:</strong> ${err.message}`;
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}AI Security Analyst — ThreatLens{% endblock %}
+{% block breadcrumb %}AI Security Analysis{% endblock %}
+
+{% block content %}
+<!-- Top Header & Scan Selector -->
+<div class="threat-card mb-4">
+    <div class="threat-card-header">
+        <div>
+            <h3 class="threat-card-title">
+                <i class="bi bi-cpu text-primary"></i> AI Security Analyst Engine
+            </h3>
+            <p class="text-muted small mb-0">
+                Automated executive synthesis, prioritized remediation queues, and natural-language narrative generation.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="status-pill status-pill-info">
+                <i class="bi bi-robot"></i> Engine: {{ ai.get('provider', 'builtin')|capitalize }}
+            </span>
+        </div>
+    </div>
+
+    <div class="threat-card-body p-3">
+        <form method="GET" action="{{ url_for('ai_analysis_view') }}" class="row g-2 align-items-center">
+            <div class="col-md-6">
+                <label class="form-label small text-muted fw-semibold mb-1">Select Target Audit Session:</label>
+                <select name="scan_id" class="form-select form-select-sm threat-input" onchange="window.location.href='/ai-analysis/' + this.value">
+                    {% for s in all_scans %}
+                        <option value="{{ s.id }}" {% if selected_scan_id == s.id %}selected{% endif %}>
+                            {{ s.domain }} &bull; Score {{ s.risk_score }}/100 ({{ s.created_at[:16] }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if scan %}
+                <div class="col-md-6 text-md-end pt-3">
+                    <a href="{{ url_for('results', scan_id=scan.id) }}" class="btn btn-sm btn-threat-secondary">
+                        <i class="bi bi-card-checklist"></i> View Raw Findings
+                    </a>
+                    <a href="{{ url_for('report_viewer', scan_id=scan.id) }}" class="btn btn-sm btn-threat-primary">
+                        <i class="bi bi-file-earmark-pdf"></i> View Audit Report
+                    </a>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if scan and ai %}
+    <!-- Target Overview Ribbon -->
+    <div class="threat-card mb-4">
+        <div class="threat-card-body p-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="score-badge {% if scan.risk_grade in ('A','B') %}score-badge-a{% elif scan.risk_grade == 'C' %}score-badge-c{% else %}score-badge-f{% endif %}">
+                        {{ scan.risk_grade }}
+                    </div>
+                    <div>
+                        <h4 class="fw-bold text-dark mb-0">{{ scan.domain }}</h4>
+                        <div class="text-muted small">
+                            Posture Score: <strong>{{ scan.risk_score }}/100</strong> &bull; Total Identified Findings: <strong>{{ scan.total_findings }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-secondary border py-2 px-3 mb-0 small" style="font-size: 0.78rem;">
+                    <i class="bi bi-shield-exclamation text-primary me-1"></i>
+                    <strong>Advisory Guardrail:</strong> AI-generated explanations interpret verified technical findings and do not invent unobserved vulnerabilities.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section A: Executive Summary -->
+    <div class="threat-card mb-4">
+        <div class="threat-card-header">
+            <h4 class="threat-card-title">
+                <i class="bi bi-briefcase text-primary"></i> A. Executive Summary
+            </h4>
+        </div>
+        <div class="threat-card-body p-4">
+            <p class="text-dark" style="font-size: 0.95rem; line-height: 1.65;">
+                {{ ai.get('executive_summary') or scan.recon.get('ai_explanation') }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Section B: Risk Prioritization Queue -->
+    <div class="threat-card mb-4">
+        <div class="threat-card-header d-flex align-items-center justify-content-between">
+            <h4 class="threat-card-title">
+                <i class="bi bi-sort-numeric-down text-primary"></i> B. Risk Prioritization & Triage Queue
+            </h4>
+            <span class="text-muted small">Ordered by computed risk impact weight</span>
+        </div>
+        <div class="threat-card-body p-0">
+            {% set prio = ai.get('risk_prioritization')|default([]) %}
+            {% if prio %}
+                <div class="table-responsive">
+                    <table class="threat-table">
+                        <thead>
+                            <tr>
+                                <th>Finding ID</th>
+                                <th>Security Issue</th>
+                                <th>Severity</th>
+                                <th>Confidence</th>
+                                <th>Triage Urgency</th>
+                                <th>Immediate Recommended Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in prio %}
+                                <tr>
+                                    <td><code>{{ p.finding_id }}</code></td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">{{ p.title }}</div>
+                                        <div class="text-muted small text-truncate" style="max-width: 320px;">{{ p.potential_impact }}</div>
+                                    </td>
+                                    <td><span class="badge-sev badge-sev-{{ p.severity|lower }}">{{ p.severity }}</span></td>
+                                    <td><span class="badge bg-light text-muted border">{{ p.confidence }}</span></td>
+                                    <td><span class="badge bg-light text-dark border">{{ p.urgency }}</span></td>
+                                    <td class="small text-dark" style="max-width: 280px;">{{ p.action }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted small p-4 mb-0 text-center">No active risk findings require prioritization.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Section C: Phased Remediation Guidance -->
+    <div class="threat-card mb-4">
+        <div class="threat-card-header">
+            <h4 class="threat-card-title">
+                <i class="bi bi-tools text-primary"></i> C. Phased Remediation Roadmap
+            </h4>
+        </div>
+        <div class="threat-card-body p-4">
+            {% set rem = ai.get('remediation_guidance')|default({}) %}
+            <div class="row g-4">
+                <!-- Phase 1 -->
+                <div class="col-md-4">
+                    <div class="p-3 rounded border h-100" style="border-top: 3px solid var(--sev-critical-solid) !important;">
+                        <h6 class="fw-bold text-dark mb-2">Phase 1: Immediate Mitigations</h6>
+                        <span class="badge bg-danger bg-opacity-10 text-danger mb-2" style="font-size: 0.72rem;">Within 24-48 Hours</span>
+                        <ul class="list-unstyled small mb-0 d-flex flex-column gap-2 text-dark">
+                            {% for a in rem.get('phase1_urgent', []) %}
+                                <li><i class="bi bi-arrow-right-short text-danger"></i> {{ a }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Phase 2 -->
+                <div class="col-md-4">
+                    <div class="p-3 rounded border h-100" style="border-top: 3px solid var(--sev-medium-solid) !important;">
+                        <h6 class="fw-bold text-dark mb-2">Phase 2: Configuration Hardening</h6>
+                        <span class="badge bg-warning bg-opacity-10 text-dark mb-2" style="font-size: 0.72rem;">Next Deployment Cycle</span>
+                        <ul class="list-unstyled small mb-0 d-flex flex-column gap-2 text-dark">
+                            {% for a in rem.get('phase2_hardening', []) %}
+                                <li><i class="bi bi-arrow-right-short text-warning"></i> {{ a }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Phase 3 -->
+                <div class="col-md-4">
+                    <div class="p-3 rounded border h-100" style="border-top: 3px solid var(--sev-low-solid) !important;">
+                        <h6 class="fw-bold text-dark mb-2">Phase 3: Defensive Best Practices</h6>
+                        <span class="badge bg-info bg-opacity-10 text-info mb-2" style="font-size: 0.72rem;">Routine Maintenance</span>
+                        <ul class="list-unstyled small mb-0 d-flex flex-column gap-2 text-dark">
+                            {% for a in rem.get('phase3_hygiene', []) %}
+                                <li><i class="bi bi-arrow-right-short text-primary"></i> {{ a }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section D: Natural-Language Narrative Report -->
+    <div class="threat-card mb-4">
+        <div class="threat-card-header d-flex align-items-center justify-content-between">
+            <h4 class="threat-card-title">
+                <i class="bi bi-journal-text text-primary"></i> D. Natural-Language Audit Narrative
+            </h4>
+            <button type="button" class="btn btn-sm btn-threat-secondary" onclick="copyNarrative()">
+                <i class="bi bi-clipboard me-1"></i> Copy Report Text
+            </button>
+        </div>
+        <div class="threat-card-body p-4">
+            <div id="narrativeContent" class="p-3 bg-light rounded border small text-dark font-monospace" style="white-space: pre-wrap; line-height: 1.6;">
+{{ ai.get('natural_language_report') or ai.get('executive_summary') }}
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="bi bi-cpu"></i></div>
+        <h4 class="empty-state-title">No Scans Available for AI Synthesis</h4>
+        <p class="empty-state-desc">Run a website security audit first to generate AI-assisted executive explanations and remediation plans.</p>
+        <a href="{{ url_for('scan') }}" class="btn btn-threat-primary">
+            Launch New Scan
+        </a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function copyNarrative() {
+        const text = document.getElementById("narrativeContent").innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("AI Narrative Report copied to clipboard!");
+        });
+    }
+</script>
+{% endblock %}
